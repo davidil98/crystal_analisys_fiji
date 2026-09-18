@@ -2,10 +2,34 @@ import customtkinter as ctk
 import pandas as pd
 import subprocess
 import os
+import platform
 from tkinter import filedialog, messagebox
+from customtkinter import set_widget_scaling, set_window_scaling
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
+
+def get_linux_scaling():
+    try:
+        output = subprocess.check_output("xdpyinfo 2>/dev/null | grep dots", shell=True).decode("utf-8")
+        dpi = int(output.split()[1].split('x')[0])
+        if dpi >= 192:
+            return 2.0
+        elif dpi >= 144:
+            return 1.5
+        else:
+            return 1.0
+    except:
+        return 1.0
+
+if platform.system() == "Linux":
+    scaling = get_linux_scaling()
+    if scaling == 1.0:
+        set_window_scaling(2)
+        set_widget_scaling(2)
+    else:
+        set_window_scaling(scaling)
+        set_widget_scaling(scaling)
 
 class CrystalApp(ctk.CTk):
     def __init__(self):
@@ -61,21 +85,33 @@ class CrystalApp(ctk.CTk):
             messagebox.showwarning("Atención", "Por favor selecciona primero las carpetas de entrada y salida.")
             return
 
-        # Asegúrate de que esta ruta a Fiji es correcta en tu ordenador
-        ruta_fiji = r"C:\Program Files\Fiji.app\ImageJ-win64.exe" 
-        if not os.path.exists(ruta_fiji):
-            messagebox.showinfo("Fiji no encontrado", "No se encontró Fiji en la ruta por defecto. Por favor, selecciona el archivo 'ImageJ-win64.exe' de la carpeta donde instalaste Fiji.")
-            ruta_fiji = filedialog.askopenfilename(title="Selecciona ImageJ-win64.exe", filetypes=[("Ejecutables", "*.exe")])
-            if not ruta_fiji:
-                return # Si el usuario cancela la selección, salimos
+        if platform.system() == "Windows":
+            ruta_fiji = r"C:\Program Files\Fiji.app\ImageJ-win64.exe"
+            if not os.path.exists(ruta_fiji):
+                messagebox.showinfo("Fiji no encontrado", "No se encontró Fiji en la ruta por defecto. Por favor, selecciona el archivo 'ImageJ-win64.exe' de la carpeta donde instalaste Fiji.")
+                ruta_fiji = filedialog.askopenfilename(title="Selecciona ImageJ-win64.exe", filetypes=[("Ejecutables", "*.exe")])
+                if not ruta_fiji:
+                    return
+        else:
+            home = os.path.expanduser("~")
+            ruta_fiji = os.path.join(home, "Fiji.app", "ImageJ-linux64")
+            if not os.path.exists(ruta_fiji):
+                ruta_fiji = os.path.join(home, "Fiji.app", "fiji")
+            if not os.path.exists(ruta_fiji):
+                messagebox.showinfo("Fiji no encontrado", "No se encontró Fiji en ~/Fiji.app. Por favor, selecciona el ejecutable de Fiji.")
+                ruta_fiji = filedialog.askopenfilename(title="Selecciona Fiji", filetypes=[("Ejecutables", "*")])
+                if not ruta_fiji:
+                    return
         
-        ruta_macro = r"C:\Users\silvi\OneDrive\Desktop\Codigo_Cristales_Davit\codigo_cristales.ijm"
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ruta_macro = os.path.join(script_dir, "codigo_cristales.ijm")
+        if not os.path.exists(ruta_macro):
+            messagebox.showerror("Error", f"No se encontró la macro en:\n{ruta_macro}")
+            return
         
-        # Pasamos los argumentos separados por un asterisco
         args = f"{self.dir_input}*{self.dir_salida}"
 
         try:
-            # Llama a Fiji sin modo 'headless' para que la interfaz gráfica aparezca y puedas usar el waitForUser
             subprocess.Popen([ruta_fiji, "-macro", ruta_macro, args])
         except Exception as e:
             messagebox.showerror("Error", f"Verifica la ruta de Fiji:\n{e}")
